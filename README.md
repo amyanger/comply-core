@@ -1,23 +1,16 @@
 # ComplyCore
 
-**If you're a one-person IT team at a charity and ISO 27001 audit prep makes you want to cry — this is for you.**
+Open-source evidence collection engine for **ISO 27001:2022** compliance. ComplyCore connects to your Microsoft 365 tenant via the Graph API, automatically collects compliance evidence, maps it to Annex A controls, evaluates compliance status, and generates audit-ready reports.
 
-ComplyCore is an open-source evidence collection engine for ISO 27001:2022. It connects to your Microsoft 365 tenant, automatically pulls compliance evidence, maps it to Annex A controls, and produces audit-ready reports.
+## Features
 
-No more screenshots. No more spreadsheets. No more manually proving you have MFA enabled for the third year running.
-
-## What it does
-
-- Connects to Microsoft Graph API (Azure AD, Intune, Defender)
-- Collects evidence automatically: MFA status, Conditional Access policies, privileged roles, device compliance, audit logs, Secure Score
-- Maps evidence to ISO 27001:2022 Annex A controls
-- Evaluates compliance status using configurable YAML rules
-- Generates audit-ready HTML reports
-- Maintains an integrity chain (SHA-256) so evidence is tamper-evident
-
-## What it doesn't do
-
-ComplyCore is **not** a GRC platform. No risk registers, no policy management, no workflow approvals. It's the plumbing that feeds into whatever GRC tool you already use — CISO Assistant, Eramba, or just a well-organised folder.
+- **Automated evidence collection** from Azure AD, Intune, Defender, and Microsoft Secure Score via the Microsoft Graph API
+- **ISO 27001:2022 Annex A mapping** across 21+ controls covering MFA enrollment, Conditional Access, privileged roles, device compliance, audit logs, and more
+- **Configurable evaluation rules** defined in YAML — adjust compliance thresholds without changing code
+- **Audit-ready HTML reports** — evidence packs, gap reports, and executive summaries in a single static file
+- **Tamper-evident evidence chain** — SHA-256 hash chain ensures integrity of collected evidence
+- **Extensible collector architecture** — add new evidence sources by adding a single Python file
+- **Self-hosted and offline** — all data stays on your infrastructure, no external SaaS dependencies
 
 ## Quick Start
 
@@ -27,18 +20,23 @@ ComplyCore is **not** a GRC platform. No risk registers, no policy management, n
 pip install comply-core
 ```
 
+Requires Python 3.11+.
+
 ### 2. Register an Azure AD App
 
-You need an app registration in Azure AD with **application permissions**. See [docs/setup.md](docs/setup.md) for a step-by-step walkthrough.
+Create an app registration in Azure AD with **application permissions**. See [docs/setup.md](docs/setup.md) for a full walkthrough.
 
-Required permissions:
-- `User.Read.All`
-- `Directory.Read.All`
-- `Policy.Read.All`
-- `Reports.Read.All`
-- `AuditLog.Read.All`
-- `SecurityEvents.Read.All`
-- `DeviceManagementManagedDevices.Read.All`
+Required Microsoft Graph permissions:
+
+| Permission | Purpose |
+|------------|---------|
+| `User.Read.All` | User account inventory |
+| `Directory.Read.All` | Privileged role assignments |
+| `Policy.Read.All` | Conditional Access and auth policies |
+| `Reports.Read.All` | MFA enrollment status |
+| `AuditLog.Read.All` | Directory audit logs |
+| `SecurityEvents.Read.All` | Microsoft Secure Score |
+| `DeviceManagementManagedDevices.Read.All` | Device compliance status |
 
 ### 3. Configure
 
@@ -46,7 +44,7 @@ Required permissions:
 comply-core init
 ```
 
-This prompts for your Tenant ID, Client ID, and Client Secret. The secret is encrypted and stored locally.
+Prompts for your Tenant ID, Client ID, and Client Secret. Credentials are encrypted locally using Fernet symmetric encryption.
 
 ### 4. Collect Evidence
 
@@ -57,86 +55,98 @@ comply-core collect
 # Collect specific controls only
 comply-core collect --controls A.5.17 A.8.2
 
-# Dry run — see what would be collected
+# Preview what will be collected without making API calls
 comply-core collect --dry-run
 ```
 
-### 5. Review Gaps
+### 5. Review Compliance Gaps
 
 ```bash
-# Table view
+# Table output
 comply-core gaps
 
-# JSON output for piping to other tools
+# JSON output for integration with other tools
 comply-core gaps --format json
 ```
 
 ### 6. Generate Reports
 
 ```bash
-# Full evidence pack
+# Full evidence pack for auditors
 comply-core report --template evidence_pack --output ./audit-pack/
 
-# Gap report
+# Gap analysis report
 comply-core report --template gap_report --output ./audit-pack/
 
-# Executive summary
+# Executive summary with compliance overview
 comply-core report --template executive_summary --output ./audit-pack/
 ```
 
-### 7. Verify Integrity
+### 7. Verify Evidence Integrity
 
 ```bash
 comply-core verify
 ```
 
-## How It Works
+Walks the SHA-256 hash chain for all collected evidence and flags any tampering or chain breaks.
+
+## Architecture
 
 ```
-Microsoft 365          ComplyCore                     Output
-┌──────────┐     ┌──────────────────┐          ┌─────────────┐
-│ Azure AD │────▶│ Collectors       │──────────▶│ HTML Reports│
-│ Intune   │     │ Evidence Store   │          │ Gap Analysis│
-│ Defender │     │ Control Mapper   │          │ JSON Export │
-│ Secure   │     │ Evaluator        │          │ Audit Pack  │
-│ Score    │     └──────────────────┘          └─────────────┘
-└──────────┘            │
-                        ▼
-                  ~/.comply-core/
-                  ├── config.yaml
-                  ├── evidence.db
-                  └── evidence/
-                      └── 2026-02-25/
-                          ├── A_5_17_*.json
-                          └── A_8_2_*.json
+Microsoft 365            ComplyCore                       Output
+┌──────────────┐   ┌─────────────────────┐   ┌────────────────────┐
+│ Azure AD     │──>│ Collectors          │──>│ HTML Reports       │
+│ Intune       │   │ Evaluator           │   │ Gap Analysis       │
+│ Defender     │   │ Control Mapper      │   │ Executive Summary  │
+│ Secure Score │   │ Evidence Store      │   │ JSON Export        │
+└──────────────┘   └─────────────────────┘   └────────────────────┘
+                           │
+                           v
+                     ~/.comply-core/
+                     ├── config.yaml          # Encrypted credentials
+                     ├── evidence.db          # SQLite metadata index
+                     └── evidence/
+                         └── 2026-02-25/
+                             ├── A_5_17_mfa_enrollment.json
+                             └── A_8_2_privileged_access.json
 ```
 
-Evidence is immutable — once collected, files are never modified. A SHA-256 hash chain links each collection run, making tampering detectable.
+Evidence files are immutable — once written, they are never modified. Each record includes a `content_hash` (SHA-256 of the file) and a `previous_hash` linking to the prior collection for the same control, forming a per-control hash chain.
 
 ## Customisation
 
-### Adjust compliance thresholds
+### Compliance Thresholds
 
-Edit `mappings/iso27001-2022.yaml` to change evaluation rules:
+Evaluation rules are defined in `mappings/iso27001-2022.yaml` and can be adjusted without modifying source code:
 
 ```yaml
-# Example: require 98% MFA coverage instead of 95%
 evaluation:
   rules:
-    - condition: "mfa_coverage >= 98"
+    - condition: "mfa_coverage >= 100"
       status: COMPLIANT
       severity: NONE
-      note: "MFA coverage meets organisational threshold"
+      note: "All users enrolled in MFA"
+    - condition: "mfa_coverage >= 95"
+      status: PARTIAL
+      severity: LOW
+      note: "MFA coverage above 95% — review exceptions"
+    - condition: "mfa_coverage < 95"
+      status: NON_COMPLIANT
+      severity: HIGH
+      note: "MFA coverage below 95% — remediation required"
 ```
 
-### Add a new framework
+### Adding Frameworks
 
-Create a YAML file in `mappings/` following the same structure. ComplyCore will load it.
+Create a new YAML file in `mappings/` following the same structure as `iso27001-2022.yaml`. See [docs/mappings.md](docs/mappings.md) for the schema reference.
+
+### Writing Custom Collectors
+
+Implement a subclass of `BaseCollector` in `comply_core/collectors/`. See [docs/collectors.md](docs/collectors.md) for the collector API.
 
 ## Development
 
 ```bash
-# Clone and install dev dependencies
 git clone https://github.com/amyanger/comply-core.git
 cd comply-core
 pip install -e ".[dev]"
@@ -152,10 +162,20 @@ ruff format .
 mypy comply_core/
 ```
 
-## Why not Vanta/Drata/etc?
+## Tech Stack
 
-Those tools are excellent — if you can afford them. At £15,000–£80,000 per year, they're priced for well-funded startups and enterprises. ComplyCore exists for the 50-person charity running Microsoft 365 where one person does IT, compliance, and probably facilities management too.
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.11+ |
+| CLI | Click |
+| Auth | MSAL (client credentials flow) |
+| HTTP | httpx (async) |
+| Data | SQLite + JSON |
+| Templates | Jinja2 |
+| Testing | pytest + pytest-asyncio |
+| Linting | ruff |
+| Type checking | mypy |
 
 ## Licence
 
-Apache 2.0 — use it, modify it, contribute back if you can.
+[Apache 2.0](LICENSE)
