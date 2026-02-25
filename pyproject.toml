@@ -40,6 +40,12 @@ dev = [
 pdf = [
     "weasyprint>=60.0",
 ]
+docs = [
+    "pypdf>=4.0",
+]
+llm = [
+    "anthropic>=0.39",
+]
 
 [project.scripts]
 comply-core = "comply_core.cli:cli"

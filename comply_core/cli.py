@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from pathlib import Path
 
 import click
@@ -39,6 +38,20 @@ def _load_config_or_exit(ctx: click.Context) -> ComplyConfig:
     except ComplyConfigError as exc:
         click.echo(click.style(f"Error: {exc}", fg="red"), err=True)
         raise SystemExit(1) from exc
+
+
+_DEMO_DIR = Path.home() / ".comply-core-demo"
+
+
+def _demo_config() -> ComplyConfig:
+    """Create an in-memory config for demo mode (no Azure credentials needed)."""
+    return ComplyConfig(
+        tenant_id="demo-tenant",
+        client_id="demo-client",
+        client_secret_encrypted="unused",
+        evidence_dir=str(_DEMO_DIR / "evidence"),
+        database_path=str(_DEMO_DIR / "evidence.db"),
+    )
 
 
 # -- init command --
@@ -103,17 +116,37 @@ def init(ctx: click.Context) -> None:
     help="Specific control IDs to collect (e.g., A.5.17 A.8.2). Collects all if omitted.",
 )
 @click.option("--dry-run", is_flag=True, help="Show what would be collected without running.")
+@click.option("--demo", is_flag=True, help="Run with simulated data (no Azure connection needed).")
+@click.option(
+    "--docs",
+    "docs_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help="Path to governance documents directory for offline document audit.",
+)
 @click.pass_context
-def collect(ctx: click.Context, controls: tuple[str, ...], dry_run: bool) -> None:
+def collect(
+    ctx: click.Context, controls: tuple[str, ...], dry_run: bool, demo: bool, docs_dir: Path | None,
+) -> None:
     """Collect compliance evidence from configured sources."""
-    config = _load_config_or_exit(ctx)
+    if demo:
+        config = _demo_config()
+        click.echo(click.style(
+            "DEMO MODE — using simulated data (no Azure connection)",
+            fg="yellow", bold=True,
+        ))
+        click.echo()
+    else:
+        config = _load_config_or_exit(ctx)
+
+    import os
 
     from comply_core.mappers.framework import load_framework
     from comply_core.mappers.control_mapper import ControlMapper
     from comply_core.mappers.evaluator import Evaluator
     from comply_core.store.evidence_store import EvidenceStore
     from comply_core.collectors.microsoft_graph import MicrosoftGraphCollector
-    from comply_core.utils.graph_client import GraphClient
+    from comply_core.collectors.manual import ManualCollector
 
     mappings_dir = Path(__file__).parent.parent / "mappings"
     framework = load_framework(mappings_dir / "iso27001-2022.yaml")
@@ -139,12 +172,33 @@ def collect(ctx: click.Context, controls: tuple[str, ...], dry_run: bool) -> Non
     )
     store.initialise()
 
-    graph_client = GraphClient(config)
-    graph_collector = MicrosoftGraphCollector(graph_client)
+    if demo:
+        from comply_core.collectors.demo_client import DemoGraphClient
+        graph_client = DemoGraphClient()
+    else:
+        from comply_core.utils.graph_client import GraphClient
+        graph_client = GraphClient(config)
+
+    if docs_dir is not None:
+        from comply_core.collectors.document import DocumentCollector
+        manual_collector = DocumentCollector(docs_dir)
+        mode = "LLM" if os.environ.get("ANTHROPIC_API_KEY") else "keyword"
+        click.echo(click.style(
+            f"DOCUMENT AUDIT — scanning {docs_dir} ({mode} mode)",
+            fg="cyan", bold=True,
+        ))
+        click.echo()
+    else:
+        manual_collector = ManualCollector()
+
+    collectors = {
+        "microsoft_graph": MicrosoftGraphCollector(graph_client),
+        "manual": manual_collector,
+    }
     evaluator = Evaluator(framework)
 
     results = asyncio.run(_run_collection(
-        target_controls, framework, graph_collector, evaluator, store, mapper,
+        target_controls, framework, collectors, evaluator, store, mapper,
     ))
 
     # Summary
@@ -168,7 +222,7 @@ def collect(ctx: click.Context, controls: tuple[str, ...], dry_run: bool) -> Non
 async def _run_collection(
     target_controls: list[str],
     framework: object,
-    graph_collector: object,
+    collectors: dict,
     evaluator: object,
     store: object,
     mapper: object,
@@ -177,12 +231,10 @@ async def _run_collection(
     from comply_core.store.evidence_store import EvidenceRecord, EvidenceStore
     from comply_core.mappers.framework import Framework, Control
     from comply_core.mappers.evaluator import Evaluator
-    from comply_core.collectors.microsoft_graph import MicrosoftGraphCollector
     from comply_core.collectors.base import BaseCollector
     from comply_core.exceptions import ComplyCollectionError, ComplyAuthError
 
     fw: Framework = framework  # type: ignore[assignment]
-    gc: MicrosoftGraphCollector = graph_collector  # type: ignore[assignment]
     ev: Evaluator = evaluator  # type: ignore[assignment]
     st: EvidenceStore = store  # type: ignore[assignment]
 
@@ -196,8 +248,15 @@ async def _run_collection(
         click.echo(click.style(f"  [{cid}] {ctrl.name}", fg="cyan"))
 
         for task in ctrl.collectors:
+            collector: BaseCollector | None = collectors.get(task.api)
+            if collector is None:
+                click.echo(click.style(
+                    f"    SKIPPED — no collector for '{task.api}'", fg="white",
+                ))
+                continue
+
             try:
-                record = await gc.collect(cid, {
+                record = await collector.collect(cid, {
                     "id": task.id,
                     "description": task.description,
                     "endpoint": task.endpoint,
@@ -226,7 +285,7 @@ async def _run_collection(
                     control_id=cid,
                     control_name=ctrl.name,
                     collected_at=datetime.now(timezone.utc),
-                    source=gc.source_id,
+                    source=collector.source_id,
                     collector_version=__version__,
                     summary={"error": str(exc)},
                     finding=Finding(
@@ -250,10 +309,11 @@ async def _run_collection(
 
 @cli.command()
 @click.option("--format", "output_format", type=click.Choice(["table", "json"]), default="table")
+@click.option("--demo", is_flag=True, help="Use demo evidence store.")
 @click.pass_context
-def gaps(ctx: click.Context, output_format: str) -> None:
+def gaps(ctx: click.Context, output_format: str, demo: bool) -> None:
     """Show compliance gap report — controls that are not fully compliant."""
-    config = _load_config_or_exit(ctx)
+    config = _demo_config() if demo else _load_config_or_exit(ctx)
 
     from comply_core.store.evidence_store import EvidenceStore
     from comply_core.mappers.framework import load_framework
@@ -343,10 +403,11 @@ def gaps(ctx: click.Context, output_format: str) -> None:
 
 
 @cli.command()
+@click.option("--demo", is_flag=True, help="Use demo evidence store.")
 @click.pass_context
-def verify(ctx: click.Context) -> None:
+def verify(ctx: click.Context, demo: bool) -> None:
     """Verify evidence integrity by walking the hash chain."""
-    config = _load_config_or_exit(ctx)
+    config = _demo_config() if demo else _load_config_or_exit(ctx)
 
     from comply_core.store.evidence_store import EvidenceStore
     from comply_core.store.integrity import verify_chain
@@ -397,15 +458,17 @@ def verify(ctx: click.Context) -> None:
     default="evidence_pack",
     help="Report template to use.",
 )
+@click.option("--demo", is_flag=True, help="Use demo evidence store.")
 @click.pass_context
 def report(
     ctx: click.Context,
     output_format: str,
     output_dir: Path,
     template: str,
+    demo: bool,
 ) -> None:
     """Generate an audit-ready HTML report."""
-    config = _load_config_or_exit(ctx)
+    config = _demo_config() if demo else _load_config_or_exit(ctx)
 
     from comply_core.reports.generator import ReportGenerator
     from comply_core.store.evidence_store import EvidenceStore
