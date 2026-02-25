@@ -135,7 +135,7 @@ pip install 'comply-core[llm-gemini]'      # Gemini
 
 **How it works:**
 - **Keyword mode (default):** Scans filenames (weighted 2x) and content for control-specific keywords. Free, fully offline.
-- **LLM mode (when an API key is set):** Pre-filters docs with keywords, then sends relevant ones to your chosen AI provider for quality assessment. Returns a quality score (0-100), reasoning, and gap identification. Falls back to keyword mode on any error. Supports Claude, ChatGPT, and Gemini — the first API key found is used.
+- **LLM mode (when an API key is set):** Pre-filters docs with keywords, then sends relevant ones to your chosen AI provider for quality assessment. Returns a quality score (0-100), reasoning, and gap identification. Falls back to keyword mode on any error. Supports Claude, ChatGPT, and Gemini — the first API key found is used. Override the default model with `COMPLY_LLM_MODEL=<model-name>`.
 
 **Matched controls produce `COMPLIANT`** instead of `MANUAL_REQUIRED`. Unmatched controls remain `MANUAL_REQUIRED`.
 

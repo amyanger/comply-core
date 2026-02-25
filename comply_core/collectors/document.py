@@ -193,16 +193,45 @@ def _load_documents(docs_dir: Path) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+_DEFAULT_MODELS = {
+    "anthropic": "claude-sonnet-4-20250514",
+    "openai": "gpt-4o",
+    "gemini": "gemini-2.0-flash",
+}
+
+
+def _get_model(provider: str) -> str:
+    """Return the model to use — honours COMPLY_LLM_MODEL env var override."""
+    return os.environ.get("COMPLY_LLM_MODEL", _DEFAULT_MODELS.get(provider, ""))
+
+
+def _extract_json(text: str) -> str:
+    """Strip markdown code fences and surrounding whitespace so json.loads works."""
+    text = text.strip()
+    # ```json ... ``` or ``` ... ```
+    if text.startswith("```"):
+        # Drop first line (```json or ```) and trailing ```
+        lines = text.split("\n")
+        lines = lines[1:]  # drop opening fence
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text
+
+
 def _call_llm(prompt: str, api_key: str, provider: str) -> str | None:
     """Send *prompt* to the chosen LLM provider and return the response text."""
+    raw: str | None = None
     if provider == "anthropic":
-        return _call_anthropic(prompt, api_key)
-    if provider == "openai":
-        return _call_openai(prompt, api_key)
-    if provider == "gemini":
-        return _call_gemini(prompt, api_key)
-    logger.warning("Unknown LLM provider: %s", provider)
-    return None
+        raw = _call_anthropic(prompt, api_key)
+    elif provider == "openai":
+        raw = _call_openai(prompt, api_key)
+    elif provider == "gemini":
+        raw = _call_gemini(prompt, api_key)
+    else:
+        logger.warning("Unknown LLM provider: %s", provider)
+        return None
+    return _extract_json(raw) if raw else None
 
 
 def _call_anthropic(prompt: str, api_key: str) -> str | None:
@@ -213,7 +242,7 @@ def _call_anthropic(prompt: str, api_key: str) -> str | None:
         return None
     client = Anthropic(api_key=api_key)
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=_get_model("anthropic"),
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -228,8 +257,9 @@ def _call_openai(prompt: str, api_key: str) -> str | None:
         return None
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=_get_model("openai"),
         max_tokens=512,
+        response_format={"type": "json_object"},
         messages=[{"role": "user", "content": prompt}],
     )
     return (response.choices[0].message.content or "").strip()
@@ -238,6 +268,7 @@ def _call_openai(prompt: str, api_key: str) -> str | None:
 def _call_gemini(prompt: str, api_key: str) -> str | None:
     try:
         from google import genai  # type: ignore[import-untyped]
+        from google.genai import types  # type: ignore[import-untyped]
     except ImportError:
         logger.warning(
             "google-genai package not installed (pip install 'comply-core[llm-gemini]')"
@@ -245,8 +276,11 @@ def _call_gemini(prompt: str, api_key: str) -> str | None:
         return None
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=_get_model("gemini"),
         contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+        ),
     )
     return (response.text or "").strip()
 
@@ -426,7 +460,15 @@ class DocumentCollector(BaseCollector):
 
         import json as _json
 
-        result = _json.loads(raw_text)
+        try:
+            result = _json.loads(raw_text)
+        except _json.JSONDecodeError:
+            logger.warning(
+                "LLM returned invalid JSON for %s — falling back to keyword matching. "
+                "Response was: %.200s",
+                task_id, raw_text,
+            )
+            return self._keyword_match(control_id, task_id, description)
 
         quality = int(result.get("document_quality", 0))
         reasoning = result.get("reasoning", "")
