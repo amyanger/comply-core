@@ -1,0 +1,56 @@
+{
+    "value": [
+        {
+            "id": "user-001",
+            "userPrincipalName": "alice@contoso.com",
+            "userDisplayName": "Alice Johnson",
+            "isMfaRegistered": true,
+            "isMfaCapable": true,
+            "isSsprRegistered": true,
+            "isSsprEnabled": true,
+            "isSsprCapable": true,
+            "isPasswordlessCapable": false,
+            "methodsRegistered": ["microsoftAuthenticatorPush", "mobilePhone"],
+            "defaultMfaMethod": "microsoftAuthenticatorPush"
+        },
+        {
+            "id": "user-002",
+            "userPrincipalName": "bob@contoso.com",
+            "userDisplayName": "Bob Smith",
+            "isMfaRegistered": true,
+            "isMfaCapable": true,
+            "isSsprRegistered": true,
+            "isSsprEnabled": true,
+            "isSsprCapable": true,
+            "isPasswordlessCapable": true,
+            "methodsRegistered": ["fido2SecurityKey", "microsoftAuthenticatorPush"],
+            "defaultMfaMethod": "fido2SecurityKey"
+        },
+        {
+            "id": "user-003",
+            "userPrincipalName": "charlie@contoso.com",
+            "userDisplayName": "Charlie Brown",
+            "isMfaRegistered": false,
+            "isMfaCapable": false,
+            "isSsprRegistered": false,
+            "isSsprEnabled": false,
+            "isSsprCapable": false,
+            "isPasswordlessCapable": false,
+            "methodsRegistered": [],
+            "defaultMfaMethod": ""
+        },
+        {
+            "id": "user-004",
+            "userPrincipalName": "diana@contoso.com",
+            "userDisplayName": "Diana Prince",
+            "isMfaRegistered": true,
+            "isMfaCapable": true,
+            "isSsprRegistered": false,
+            "isSsprEnabled": false,
+            "isSsprCapable": false,
+            "isPasswordlessCapable": false,
+            "methodsRegistered": ["mobilePhone"],
+            "defaultMfaMethod": "mobilePhone"
+        }
+    ]
+}

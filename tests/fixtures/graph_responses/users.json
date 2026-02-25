@@ -1,0 +1,44 @@
+{
+    "value": [
+        {
+            "id": "user-001",
+            "displayName": "Alice Johnson",
+            "userPrincipalName": "alice@contoso.com",
+            "accountEnabled": true,
+            "createdDateTime": "2022-03-15T09:00:00Z",
+            "userType": "Member"
+        },
+        {
+            "id": "user-002",
+            "displayName": "Bob Smith",
+            "userPrincipalName": "bob@contoso.com",
+            "accountEnabled": true,
+            "createdDateTime": "2022-06-01T14:30:00Z",
+            "userType": "Member"
+        },
+        {
+            "id": "user-003",
+            "displayName": "Charlie Brown",
+            "userPrincipalName": "charlie@contoso.com",
+            "accountEnabled": false,
+            "createdDateTime": "2021-01-10T08:00:00Z",
+            "userType": "Member"
+        },
+        {
+            "id": "user-004",
+            "displayName": "Diana Prince",
+            "userPrincipalName": "diana@contoso.com",
+            "accountEnabled": true,
+            "createdDateTime": "2023-09-20T11:00:00Z",
+            "userType": "Member"
+        },
+        {
+            "id": "user-005",
+            "displayName": "External Consultant",
+            "userPrincipalName": "consultant@partner.com#EXT#@contoso.onmicrosoft.com",
+            "accountEnabled": true,
+            "createdDateTime": "2024-01-05T10:00:00Z",
+            "userType": "Guest"
+        }
+    ]
+}

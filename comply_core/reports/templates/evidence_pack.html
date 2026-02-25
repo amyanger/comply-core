@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Evidence Pack — {{ framework_name }}{% endblock %}
+
+{% block content %}
+<header>
+    <h1>Compliance Evidence Pack</h1>
+    <p>{{ framework_name }} {{ framework_version }} | Generated {{ generated_at }}</p>
+</header>
+
+<div class="stats">
+    <div class="stat-card">
+        <div class="number">{{ total_controls }}</div>
+        <div class="label">Total Controls</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #22c55e;">{{ compliant }}</div>
+        <div class="label">Compliant</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #f59e0b;">{{ partial }}</div>
+        <div class="label">Partial</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #ef4444;">{{ non_compliant }}</div>
+        <div class="label">Non-Compliant</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #6b7280;">{{ not_collected }}</div>
+        <div class="label">Not Collected</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #0ea5e9;">{{ manual }}</div>
+        <div class="label">Manual Required</div>
+    </div>
+</div>
+
+{% for category, controls in by_category.items() %}
+<div class="category-section">
+    <h2>{{ category }} Controls</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Control</th>
+                <th>Name</th>
+                <th style="width: 120px;">Status</th>
+                <th style="width: 80px;">Severity</th>
+                <th>Finding</th>
+                <th style="width: 120px;">Collected</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ctrl in controls %}
+            <tr>
+                <td><strong>{{ ctrl.id }}</strong></td>
+                <td>{{ ctrl.name }}</td>
+                <td>
+                    {% if ctrl.status == "COMPLIANT" %}
+                    <span class="badge badge-compliant">Compliant</span>
+                    {% elif ctrl.status == "PARTIAL" %}
+                    <span class="badge badge-partial">Partial</span>
+                    {% elif ctrl.status == "NON_COMPLIANT" %}
+                    <span class="badge badge-non-compliant">Non-Compliant</span>
+                    {% elif ctrl.status == "COLLECTION_ERROR" %}
+                    <span class="badge badge-error">Error</span>
+                    {% elif ctrl.status == "MANUAL_REQUIRED" %}
+                    <span class="badge badge-manual">Manual</span>
+                    {% else %}
+                    <span class="badge badge-not-collected">Not Collected</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="severity-{{ ctrl.severity|lower }}">{{ ctrl.severity }}</span>
+                </td>
+                <td class="note">{{ ctrl.note }}</td>
+                <td class="note">{{ ctrl.collected_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+{% endblock %}

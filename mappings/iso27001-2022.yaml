@@ -1,0 +1,632 @@
+name: "ISO 27001:2022"
+version: "2022"
+
+controls:
+  A.5.1:
+    name: "Policies for information security"
+    category: "Organisational"
+    description: "Information security policy and topic-specific policies shall be defined, approved by management, published, communicated to and acknowledged by relevant personnel and relevant interested parties, and reviewed at planned intervals."
+    collectors:
+      - id: manual_security_policy
+        description: "Information security policy document"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Security policy documented and available"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: MEDIUM
+          note: "Security policy document needs manual upload"
+
+  A.5.2:
+    name: "Information security roles and responsibilities"
+    category: "Organisational"
+    description: "Information security roles and responsibilities shall be defined and allocated."
+    collectors:
+      - id: manual_roles_responsibilities
+        description: "Roles and responsibilities documentation"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Roles and responsibilities documented"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: MEDIUM
+          note: "Roles documentation needs manual upload"
+
+  A.5.3:
+    name: "Segregation of duties"
+    category: "Organisational"
+    description: "Conflicting duties and conflicting areas of responsibility shall be segregated."
+    collectors:
+      - id: azure_ad_privileged_roles
+        description: "Directory role assignments to verify segregation"
+        api: microsoft_graph
+        endpoint: /directoryRoles
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - Directory.Read.All
+    evaluation:
+      rules:
+        - condition: "global_admin_count <= 5"
+          status: COMPLIANT
+          severity: NONE
+          note: "Global admin count within acceptable range"
+        - condition: "global_admin_count <= 10"
+          status: PARTIAL
+          severity: LOW
+          note: "Global admin count slightly elevated — review role assignments"
+        - condition: "global_admin_count > 10"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Excessive Global Administrators — segregation of duties risk"
+
+  A.5.15:
+    name: "Access control"
+    category: "Organisational"
+    description: "Rules to control physical and logical access to information and other associated assets shall be established and implemented."
+    collectors:
+      - id: azure_ad_conditional_access
+        description: "Conditional Access policies configuration"
+        api: microsoft_graph
+        endpoint: /identity/conditionalAccess/policies
+        frequency: weekly
+        evidence_type: configuration
+        graph_permissions:
+          - Policy.Read.All
+    evaluation:
+      rules:
+        - condition: "enabled >= 3"
+          status: COMPLIANT
+          severity: NONE
+          note: "Adequate Conditional Access policies in place"
+        - condition: "enabled >= 1"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "Some Conditional Access policies in place — consider adding more"
+        - condition: "enabled < 1"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "No enabled Conditional Access policies found"
+
+  A.5.16:
+    name: "Identity management"
+    category: "Organisational"
+    description: "The full life cycle of identities shall be managed."
+    collectors:
+      - id: azure_ad_users
+        description: "User listing for identity lifecycle review"
+        api: microsoft_graph
+        endpoint: "/users?$select=id,displayName,userPrincipalName,accountEnabled,createdDateTime,userType"
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - User.Read.All
+    evaluation:
+      rules:
+        - condition: "disabled <= 10"
+          status: COMPLIANT
+          severity: NONE
+          note: "Disabled account count is low — identity lifecycle well managed"
+        - condition: "disabled <= 50"
+          status: PARTIAL
+          severity: LOW
+          note: "Some disabled accounts present — review for cleanup"
+        - condition: "disabled > 50"
+          status: NON_COMPLIANT
+          severity: MEDIUM
+          note: "Many disabled accounts — identity lifecycle review needed"
+
+  A.5.17:
+    name: "Authentication information"
+    category: "Organisational"
+    description: "Allocation and management of authentication information shall be controlled through a management process."
+    collectors:
+      - id: azure_ad_mfa_enrollment
+        description: "MFA enrollment status for all users"
+        api: microsoft_graph
+        endpoint: /reports/authenticationMethods/userRegistrationDetails
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - Reports.Read.All
+          - AuditLog.Read.All
+    evaluation:
+      rules:
+        - condition: "mfa_coverage >= 100"
+          status: COMPLIANT
+          severity: NONE
+          note: "All users enrolled in MFA"
+        - condition: "mfa_coverage >= 95"
+          status: PARTIAL
+          severity: LOW
+          note: "MFA coverage above 95% — review exceptions"
+        - condition: "mfa_coverage < 95"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "MFA coverage below 95% — remediation required"
+
+  A.5.18:
+    name: "Access rights"
+    category: "Organisational"
+    description: "Access rights to information and other associated assets shall be provisioned, reviewed, modified and removed in accordance with the organisation's topic-specific policy."
+    collectors:
+      - id: azure_ad_privileged_roles
+        description: "Privileged role assignments for access review"
+        api: microsoft_graph
+        endpoint: /directoryRoles
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - Directory.Read.All
+    evaluation:
+      rules:
+        - condition: "total_privileged_users <= 20"
+          status: COMPLIANT
+          severity: NONE
+          note: "Privileged access appropriately limited"
+        - condition: "total_privileged_users <= 50"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "Elevated privileged users — access review recommended"
+        - condition: "total_privileged_users > 50"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Excessive privileged access — immediate review required"
+
+  A.5.23:
+    name: "Information security for use of cloud services"
+    category: "Organisational"
+    description: "Processes for acquisition, use, management and exit from cloud services shall be established."
+    collectors:
+      - id: ms_secure_score
+        description: "Microsoft Secure Score as cloud security indicator"
+        api: microsoft_graph
+        endpoint: "/security/secureScores?$top=1"
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - SecurityEvents.Read.All
+    evaluation:
+      rules:
+        - condition: "percentage >= 80"
+          status: COMPLIANT
+          severity: NONE
+          note: "Microsoft Secure Score above 80% — strong cloud security posture"
+        - condition: "percentage >= 50"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "Secure Score between 50-80% — improvement recommended"
+        - condition: "percentage < 50"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Secure Score below 50% — significant cloud security gaps"
+
+  A.5.24:
+    name: "Information security incident management planning and preparation"
+    category: "Organisational"
+    description: "The organisation shall plan and prepare for managing information security incidents."
+    collectors:
+      - id: manual_incident_plan
+        description: "Incident response plan documentation"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Incident response plan documented"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: HIGH
+          note: "Incident response plan needs manual upload"
+
+  A.5.29:
+    name: "Information security during disruption"
+    category: "Organisational"
+    description: "The organisation shall plan how to maintain information security at an appropriate level during disruption."
+    collectors:
+      - id: manual_bcp
+        description: "Business continuity plan documentation"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Business continuity plan documented"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: HIGH
+          note: "BCP documentation needs manual upload"
+
+  A.6.1:
+    name: "Screening"
+    category: "People"
+    description: "Background verification checks on all candidates to become personnel shall be carried out."
+    collectors:
+      - id: manual_screening
+        description: "Employee screening process documentation"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Screening process documented"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: MEDIUM
+          note: "Screening documentation needs manual upload"
+
+  A.6.3:
+    name: "Information security awareness, education and training"
+    category: "People"
+    description: "Personnel and relevant interested parties shall receive appropriate information security awareness, education and training."
+    collectors:
+      - id: manual_training
+        description: "Security awareness training records"
+        api: manual
+        endpoint: ""
+        frequency: quarterly
+        evidence_type: snapshot
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Training records available"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: MEDIUM
+          note: "Training records need manual upload"
+
+  A.7.1:
+    name: "Physical security perimeters"
+    category: "Physical"
+    description: "Security perimeters shall be defined and used to protect areas that contain information and other associated assets."
+    collectors:
+      - id: manual_physical_security
+        description: "Physical security assessment documentation"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Physical security assessment documented"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: MEDIUM
+          note: "Physical security documentation needs manual upload"
+
+  A.8.1:
+    name: "User endpoint devices"
+    category: "Technological"
+    description: "Information stored on, processed by or accessible via user endpoint devices shall be protected."
+    collectors:
+      - id: intune_managed_devices
+        description: "Managed device inventory and compliance status"
+        api: microsoft_graph
+        endpoint: /deviceManagement/managedDevices
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - DeviceManagementManagedDevices.Read.All
+    evaluation:
+      rules:
+        - condition: "noncompliant == 0"
+          status: COMPLIANT
+          severity: NONE
+          note: "All managed devices are compliant"
+        - condition: "noncompliant <= 5"
+          status: PARTIAL
+          severity: LOW
+          note: "A few non-compliant devices — review and remediate"
+        - condition: "noncompliant > 5"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Multiple non-compliant devices — remediation required"
+
+  A.8.2:
+    name: "Privileged access rights"
+    category: "Technological"
+    description: "The allocation and use of privileged access rights shall be restricted and managed."
+    collectors:
+      - id: azure_ad_privileged_roles
+        description: "Privileged role assignments and Global Admin count"
+        api: microsoft_graph
+        endpoint: /directoryRoles
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - Directory.Read.All
+    evaluation:
+      rules:
+        - condition: "global_admin_count <= 3"
+          status: COMPLIANT
+          severity: NONE
+          note: "Global Admin count appropriately limited"
+        - condition: "global_admin_count <= 5"
+          status: PARTIAL
+          severity: LOW
+          note: "Global Admin count slightly elevated"
+        - condition: "global_admin_count > 5"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Too many Global Administrators — reduce privileged access"
+
+  A.8.3:
+    name: "Information access restriction"
+    category: "Technological"
+    description: "Access to information and other associated assets shall be restricted in accordance with the established topic-specific policy."
+    collectors:
+      - id: azure_ad_conditional_access
+        description: "Conditional Access policies for access restriction"
+        api: microsoft_graph
+        endpoint: /identity/conditionalAccess/policies
+        frequency: weekly
+        evidence_type: configuration
+        graph_permissions:
+          - Policy.Read.All
+    evaluation:
+      rules:
+        - condition: "enabled >= 5"
+          status: COMPLIANT
+          severity: NONE
+          note: "Comprehensive Conditional Access policies in place"
+        - condition: "enabled >= 2"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "Some access restriction policies — consider adding more"
+        - condition: "enabled < 2"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Insufficient access restriction policies"
+
+  A.8.5:
+    name: "Secure authentication"
+    category: "Technological"
+    description: "Secure authentication technologies and procedures shall be established and implemented."
+    collectors:
+      - id: azure_ad_mfa_enrollment
+        description: "MFA enrollment as secure authentication evidence"
+        api: microsoft_graph
+        endpoint: /reports/authenticationMethods/userRegistrationDetails
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - Reports.Read.All
+          - AuditLog.Read.All
+    evaluation:
+      rules:
+        - condition: "mfa_coverage >= 100"
+          status: COMPLIANT
+          severity: NONE
+          note: "100% MFA coverage — strong authentication"
+        - condition: "mfa_coverage >= 90"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "MFA coverage above 90% but not universal"
+        - condition: "mfa_coverage < 90"
+          status: NON_COMPLIANT
+          severity: CRITICAL
+          note: "MFA coverage below 90% — critical authentication gap"
+
+  A.8.7:
+    name: "Protection against malware"
+    category: "Technological"
+    description: "Protection against malware shall be implemented and supported by appropriate user awareness."
+    collectors:
+      - id: intune_device_compliance
+        description: "Device compliance including antivirus status"
+        api: microsoft_graph
+        endpoint: /deviceManagement/managedDevices
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - DeviceManagementManagedDevices.Read.All
+    evaluation:
+      rules:
+        - condition: "compliant >= 95"
+          status: COMPLIANT
+          severity: NONE
+          note: "Device compliance rate above 95%"
+        - condition: "compliant >= 80"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "Device compliance between 80-95%"
+        - condition: "compliant < 80"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Device compliance below 80% — malware protection gaps"
+
+  A.8.9:
+    name: "Configuration management"
+    category: "Technological"
+    description: "Configurations, including security configurations, of hardware, software, services and networks shall be established, documented, implemented, monitored and reviewed."
+    collectors:
+      - id: azure_ad_conditional_access
+        description: "Security configuration via Conditional Access policies"
+        api: microsoft_graph
+        endpoint: /identity/conditionalAccess/policies
+        frequency: weekly
+        evidence_type: configuration
+        graph_permissions:
+          - Policy.Read.All
+    evaluation:
+      rules:
+        - condition: "total_policies >= 5"
+          status: COMPLIANT
+          severity: NONE
+          note: "Adequate security configuration policies defined"
+        - condition: "total_policies >= 2"
+          status: PARTIAL
+          severity: LOW
+          note: "Some configuration policies — consider expanding"
+        - condition: "total_policies < 2"
+          status: NON_COMPLIANT
+          severity: MEDIUM
+          note: "Insufficient configuration management policies"
+
+  A.8.15:
+    name: "Logging"
+    category: "Technological"
+    description: "Logs that record activities, exceptions, faults and other relevant events shall be produced, stored, protected and analysed."
+    collectors:
+      - id: azure_ad_audit_logs
+        description: "Azure AD audit log activity"
+        api: microsoft_graph
+        endpoint: "/auditLogs/directoryAudits?$top=100&$orderby=activityDateTime desc"
+        frequency: weekly
+        evidence_type: log
+        graph_permissions:
+          - AuditLog.Read.All
+    evaluation:
+      rules:
+        - condition: "entries_sampled >= 50"
+          status: COMPLIANT
+          severity: NONE
+          note: "Active audit logging with recent entries"
+        - condition: "entries_sampled >= 10"
+          status: PARTIAL
+          severity: LOW
+          note: "Some audit log activity — verify log retention"
+        - condition: "entries_sampled < 10"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Minimal audit logging — review log configuration"
+
+  A.8.16:
+    name: "Monitoring activities"
+    category: "Technological"
+    description: "Networks, systems and applications shall be monitored for anomalous behaviour and appropriate actions taken."
+    collectors:
+      - id: ms_secure_score
+        description: "Microsoft Secure Score monitoring indicator"
+        api: microsoft_graph
+        endpoint: "/security/secureScores?$top=1"
+        frequency: weekly
+        evidence_type: snapshot
+        graph_permissions:
+          - SecurityEvents.Read.All
+    evaluation:
+      rules:
+        - condition: "percentage >= 70"
+          status: COMPLIANT
+          severity: NONE
+          note: "Strong security monitoring posture"
+        - condition: "percentage >= 40"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "Moderate security monitoring — improvement recommended"
+        - condition: "percentage < 40"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "Weak security monitoring — significant gaps"
+
+  A.8.20:
+    name: "Networks security"
+    category: "Technological"
+    description: "Networks and network devices shall be secured, managed and controlled to protect information."
+    collectors:
+      - id: azure_ad_conditional_access
+        description: "Network-level Conditional Access policies"
+        api: microsoft_graph
+        endpoint: /identity/conditionalAccess/policies
+        frequency: weekly
+        evidence_type: configuration
+        graph_permissions:
+          - Policy.Read.All
+    evaluation:
+      rules:
+        - condition: "enabled >= 2"
+          status: COMPLIANT
+          severity: NONE
+          note: "Network-level access controls in place"
+        - condition: "enabled >= 1"
+          status: PARTIAL
+          severity: MEDIUM
+          note: "Limited network security policies"
+        - condition: "enabled < 1"
+          status: NON_COMPLIANT
+          severity: HIGH
+          note: "No network-level access controls detected"
+
+  A.8.24:
+    name: "Use of cryptography"
+    category: "Technological"
+    description: "Rules for the effective use of cryptography shall be defined and implemented."
+    collectors:
+      - id: manual_cryptography_policy
+        description: "Cryptography policy documentation"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "Cryptography policy documented"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: MEDIUM
+          note: "Cryptography policy needs manual upload"
+
+  A.8.25:
+    name: "Secure development life cycle"
+    category: "Technological"
+    description: "Rules for the secure development of software and systems shall be established and applied."
+    collectors:
+      - id: manual_sdlc
+        description: "Secure development lifecycle documentation"
+        api: manual
+        endpoint: ""
+        frequency: annually
+        evidence_type: configuration
+        graph_permissions: []
+    evaluation:
+      rules:
+        - condition: "document_exists == 1"
+          status: COMPLIANT
+          severity: NONE
+          note: "SDLC documentation available"
+        - condition: "document_exists == 0"
+          status: MANUAL_REQUIRED
+          severity: MEDIUM
+          note: "SDLC documentation needs manual upload"

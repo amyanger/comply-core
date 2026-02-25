@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Control Details — {{ framework_name }}{% endblock %}
+
+{% block content %}
+<header>
+    <h1>Control Detail Report</h1>
+    <p>{{ framework_name }} {{ framework_version }} | Generated {{ generated_at }}</p>
+</header>
+
+{% for category, controls in by_category.items() %}
+<h2>{{ category }} Controls</h2>
+
+{% for ctrl in controls %}
+<div class="category-section" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div>
+            <h3 style="margin: 0;">{{ ctrl.id }} — {{ ctrl.name }}</h3>
+            <p class="note" style="margin-top: 4px;">{{ ctrl.description }}</p>
+        </div>
+        <div>
+            {% if ctrl.status == "COMPLIANT" %}
+            <span class="badge badge-compliant">Compliant</span>
+            {% elif ctrl.status == "PARTIAL" %}
+            <span class="badge badge-partial">Partial</span>
+            {% elif ctrl.status == "NON_COMPLIANT" %}
+            <span class="badge badge-non-compliant">Non-Compliant</span>
+            {% elif ctrl.status == "COLLECTION_ERROR" %}
+            <span class="badge badge-error">Error</span>
+            {% elif ctrl.status == "MANUAL_REQUIRED" %}
+            <span class="badge badge-manual">Manual</span>
+            {% else %}
+            <span class="badge badge-not-collected">Not Collected</span>
+            {% endif %}
+        </div>
+    </div>
+    <table style="margin: 0;">
+        <tr>
+            <td style="width: 120px; font-weight: 600; border: none;">Severity</td>
+            <td style="border: none;"><span class="severity-{{ ctrl.severity|lower }}">{{ ctrl.severity }}</span></td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; border: none;">Finding</td>
+            <td style="border: none;">{{ ctrl.note }}</td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; border: none;">Source</td>
+            <td style="border: none;">{{ ctrl.source }}</td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; border: none;">Collected</td>
+            <td style="border: none;">{{ ctrl.collected_at }}</td>
+        </tr>
+    </table>
+</div>
+{% endfor %}
+{% endfor %}
+{% endblock %}

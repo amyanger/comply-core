@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Gap Report — {{ framework_name }}{% endblock %}
+
+{% block content %}
+<header>
+    <h1>Compliance Gap Report</h1>
+    <p>{{ framework_name }} {{ framework_version }} | Generated {{ generated_at }}</p>
+</header>
+
+<div class="stats">
+    <div class="stat-card">
+        <div class="number" style="color: #ef4444;">{{ non_compliant }}</div>
+        <div class="label">Non-Compliant</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #f59e0b;">{{ partial }}</div>
+        <div class="label">Partial</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #6b7280;">{{ not_collected }}</div>
+        <div class="label">Not Assessed</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #0ea5e9;">{{ manual }}</div>
+        <div class="label">Manual Required</div>
+    </div>
+</div>
+
+<h2>Controls Requiring Attention</h2>
+<p class="note" style="margin-bottom: 16px;">
+    This report shows only controls that are not fully compliant. Compliant controls are excluded.
+</p>
+
+{% for category, controls in by_category.items() %}
+{% set gap_controls = [] %}
+{% for ctrl in controls %}
+    {% if ctrl.status != "COMPLIANT" %}
+        {% if gap_controls.append(ctrl) %}{% endif %}
+    {% endif %}
+{% endfor %}
+
+{% if gap_controls %}
+<div class="category-section">
+    <h3>{{ category }}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Control</th>
+                <th>Name</th>
+                <th style="width: 120px;">Status</th>
+                <th style="width: 80px;">Severity</th>
+                <th>Remediation Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ctrl in gap_controls %}
+            <tr>
+                <td><strong>{{ ctrl.id }}</strong></td>
+                <td>{{ ctrl.name }}</td>
+                <td>
+                    {% if ctrl.status == "PARTIAL" %}
+                    <span class="badge badge-partial">Partial</span>
+                    {% elif ctrl.status == "NON_COMPLIANT" %}
+                    <span class="badge badge-non-compliant">Non-Compliant</span>
+                    {% elif ctrl.status == "COLLECTION_ERROR" %}
+                    <span class="badge badge-error">Error</span>
+                    {% elif ctrl.status == "MANUAL_REQUIRED" %}
+                    <span class="badge badge-manual">Manual</span>
+                    {% else %}
+                    <span class="badge badge-not-collected">Not Collected</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="severity-{{ ctrl.severity|lower }}">{{ ctrl.severity }}</span>
+                </td>
+                <td class="note">{{ ctrl.note }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

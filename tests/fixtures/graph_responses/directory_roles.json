@@ -1,0 +1,22 @@
+{
+    "value": [
+        {
+            "id": "role-ga-001",
+            "displayName": "Global Administrator",
+            "description": "Can manage all aspects of Azure AD and Microsoft services.",
+            "roleTemplateId": "62e90394-69f5-4237-9190-012177145e10"
+        },
+        {
+            "id": "role-ua-001",
+            "displayName": "User Administrator",
+            "description": "Can manage all aspects of users and groups.",
+            "roleTemplateId": "fe930be7-5e62-47db-91af-98c3a49a38b1"
+        },
+        {
+            "id": "role-sa-001",
+            "displayName": "Security Administrator",
+            "description": "Can read security info and reports.",
+            "roleTemplateId": "194ae4cb-b126-40b2-bd5b-6091b380977d"
+        }
+    ]
+}

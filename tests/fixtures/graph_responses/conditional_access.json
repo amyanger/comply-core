@@ -1,0 +1,82 @@
+{
+    "value": [
+        {
+            "id": "policy-001",
+            "displayName": "Require MFA for all users",
+            "state": "enabled",
+            "createdDateTime": "2024-01-15T10:30:00Z",
+            "modifiedDateTime": "2024-06-20T14:00:00Z",
+            "conditions": {
+                "users": {
+                    "includeUsers": ["All"]
+                },
+                "applications": {
+                    "includeApplications": ["All"]
+                }
+            },
+            "grantControls": {
+                "operator": "OR",
+                "builtInControls": ["mfa"]
+            }
+        },
+        {
+            "id": "policy-002",
+            "displayName": "Block legacy authentication",
+            "state": "enabled",
+            "createdDateTime": "2024-01-15T10:35:00Z",
+            "modifiedDateTime": "2024-01-15T10:35:00Z",
+            "conditions": {
+                "users": {
+                    "includeUsers": ["All"]
+                },
+                "clientAppTypes": ["exchangeActiveSync", "other"]
+            },
+            "grantControls": {
+                "operator": "OR",
+                "builtInControls": ["block"]
+            }
+        },
+        {
+            "id": "policy-003",
+            "displayName": "Require compliant device for Office 365",
+            "state": "enabled",
+            "createdDateTime": "2024-02-01T09:00:00Z",
+            "modifiedDateTime": "2024-07-15T11:20:00Z",
+            "conditions": {
+                "users": {
+                    "includeUsers": ["All"]
+                },
+                "applications": {
+                    "includeApplications": ["Office365"]
+                }
+            },
+            "grantControls": {
+                "operator": "OR",
+                "builtInControls": ["compliantDevice"]
+            }
+        },
+        {
+            "id": "policy-004",
+            "displayName": "Test policy - report only",
+            "state": "enabledForReportingButNotEnforced",
+            "createdDateTime": "2024-08-01T16:00:00Z",
+            "modifiedDateTime": "2024-08-01T16:00:00Z",
+            "conditions": {
+                "users": {
+                    "includeUsers": ["All"]
+                }
+            },
+            "grantControls": {
+                "operator": "OR",
+                "builtInControls": ["mfa"]
+            }
+        },
+        {
+            "id": "policy-005",
+            "displayName": "Disabled policy",
+            "state": "disabled",
+            "createdDateTime": "2023-06-01T12:00:00Z",
+            "modifiedDateTime": "2024-01-10T08:00:00Z"
+        }
+    ]
+}

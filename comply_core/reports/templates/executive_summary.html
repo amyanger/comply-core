@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Summary — {{ framework_name }}{% endblock %}
+
+{% block content %}
+<header>
+    <h1>Executive Summary</h1>
+    <p>{{ framework_name }} {{ framework_version }} Compliance Overview | {{ generated_at }}</p>
+</header>
+
+<div class="stats">
+    <div class="stat-card">
+        <div class="number">{{ total_controls }}</div>
+        <div class="label">Total Controls</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ assessed }}</div>
+        <div class="label">Assessed</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #22c55e;">{{ compliant }}</div>
+        <div class="label">Compliant</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" style="color: #ef4444;">{{ non_compliant + partial }}</div>
+        <div class="label">Gaps</div>
+    </div>
+</div>
+
+<h2>Overall Compliance Posture</h2>
+
+{% if assessed > 0 %}
+{% set compliance_pct = (compliant * 100 / total_controls)|round(1) %}
+<div style="margin: 16px 0;">
+    <div style="background: #f3f4f6; border-radius: 8px; height: 32px; overflow: hidden;">
+        <div style="background: #22c55e; height: 100%; width: {{ compliance_pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 13px; min-width: 60px;">
+            {{ compliance_pct }}%
+        </div>
+    </div>
+    <p class="note" style="margin-top: 8px;">{{ compliant }} of {{ total_controls }} controls are fully compliant.</p>
+</div>
+{% else %}
+<p class="note">No evidence has been collected yet. Run <code>comply-core collect</code> to begin.</p>
+{% endif %}
+
+<h2>Status by Category</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th style="text-align: center;">Total</th>
+            <th style="text-align: center;">Compliant</th>
+            <th style="text-align: center;">Partial</th>
+            <th style="text-align: center;">Non-Compliant</th>
+            <th style="text-align: center;">Not Assessed</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for category, controls in by_category.items() %}
+        <tr>
+            <td><strong>{{ category }}</strong></td>
+            <td style="text-align: center;">{{ controls|length }}</td>
+            <td style="text-align: center; color: #22c55e;">
+                {{ controls|selectattr("status", "equalto", "COMPLIANT")|list|length }}
+            </td>
+            <td style="text-align: center; color: #f59e0b;">
+                {{ controls|selectattr("status", "equalto", "PARTIAL")|list|length }}
+            </td>
+            <td style="text-align: center; color: #ef4444;">
+                {{ controls|selectattr("status", "equalto", "NON_COMPLIANT")|list|length }}
+            </td>
+            <td style="text-align: center; color: #6b7280;">
+                {{ controls|selectattr("status", "in", ["NOT_COLLECTED", "MANUAL_REQUIRED"])|list|length }}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if non_compliant > 0 %}
+<h2>Critical Gaps</h2>
+<p class="note" style="margin-bottom: 12px;">Controls rated Non-Compliant that require immediate attention:</p>
+<table>
+    <thead>
+        <tr>
+            <th>Control</th>
+            <th>Name</th>
+            <th>Severity</th>
+            <th>Finding</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for category, controls in by_category.items() %}
+        {% for ctrl in controls %}
+        {% if ctrl.status == "NON_COMPLIANT" %}
+        <tr>
+            <td><strong>{{ ctrl.id }}</strong></td>
+            <td>{{ ctrl.name }}</td>
+            <td><span class="severity-{{ ctrl.severity|lower }}">{{ ctrl.severity }}</span></td>
+            <td class="note">{{ ctrl.note }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
