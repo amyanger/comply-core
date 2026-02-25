@@ -2,17 +2,17 @@
 
 Open-source evidence collection engine for **ISO 27001:2022** compliance. ComplyCore connects to your Microsoft 365 tenant via the Graph API, automatically collects compliance evidence, maps it to Annex A controls, evaluates compliance status, and generates audit-ready reports.
 
-## Features
+## ✨ Features
 
-- **Automated evidence collection** from Azure AD, Intune, Defender, and Microsoft Secure Score via the Microsoft Graph API
-- **ISO 27001:2022 Annex A mapping** across 21+ controls covering MFA enrollment, Conditional Access, privileged roles, device compliance, audit logs, and more
-- **Configurable evaluation rules** defined in YAML — adjust compliance thresholds without changing code
-- **Audit-ready HTML reports** — evidence packs, gap reports, and executive summaries in a single static file
-- **Tamper-evident evidence chain** — SHA-256 hash chain ensures integrity of collected evidence
-- **Extensible collector architecture** — add new evidence sources by adding a single Python file
-- **Self-hosted and offline** — all data stays on your infrastructure, no external SaaS dependencies
+- 🔄 **Automated evidence collection** from Azure AD, Intune, Defender, and Microsoft Secure Score via the Microsoft Graph API
+- 🗺️ **ISO 27001:2022 Annex A mapping** across 21+ controls covering MFA enrollment, Conditional Access, privileged roles, device compliance, audit logs, and more
+- ⚙️ **Configurable evaluation rules** defined in YAML — adjust compliance thresholds without changing code
+- 📊 **Audit-ready HTML reports** — evidence packs, gap reports, and executive summaries in a single static file
+- 🔒 **Tamper-evident evidence chain** — SHA-256 hash chain ensures integrity of collected evidence
+- 🧩 **Extensible collector architecture** — add new evidence sources by adding a single Python file
+- 🏠 **Self-hosted and offline** — all data stays on your infrastructure, no external SaaS dependencies
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Install
 
@@ -90,7 +90,7 @@ comply-core verify
 
 Walks the SHA-256 hash chain for all collected evidence and flags any tampering or chain breaks.
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 Microsoft 365            ComplyCore                       Output
@@ -113,7 +113,7 @@ Microsoft 365            ComplyCore                       Output
 
 Evidence files are immutable — once written, they are never modified. Each record includes a `content_hash` (SHA-256 of the file) and a `previous_hash` linking to the prior collection for the same control, forming a per-control hash chain.
 
-## Customisation
+## 🔧 Customisation
 
 ### Compliance Thresholds
 
@@ -144,7 +144,7 @@ Create a new YAML file in `mappings/` following the same structure as `iso27001-
 
 Implement a subclass of `BaseCollector` in `comply_core/collectors/`. See [docs/collectors.md](docs/collectors.md) for the collector API.
 
-## Development
+## 🛠️ Development
 
 ```bash
 git clone https://github.com/amyanger/comply-core.git
@@ -162,7 +162,7 @@ ruff format .
 mypy comply_core/
 ```
 
-## Tech Stack
+## 📦 Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
@@ -176,6 +176,6 @@ mypy comply_core/
 | Linting | ruff |
 | Type checking | mypy |
 
-## Licence
+## 📄 Licence
 
 [Apache 2.0](LICENSE)
