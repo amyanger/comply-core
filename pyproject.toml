@@ -43,8 +43,14 @@ pdf = [
 docs = [
     "pypdf>=4.0",
 ]
-llm = [
+llm-anthropic = [
     "anthropic>=0.39",
+]
+llm-openai = [
+    "openai>=1.0",
+]
+llm-gemini = [
+    "google-genai>=1.0",
 ]
 
 [project.scripts]

@@ -180,9 +180,13 @@ def collect(
         graph_client = GraphClient(config)
 
     if docs_dir is not None:
-        from comply_core.collectors.document import DocumentCollector
+        from comply_core.collectors.document import DocumentCollector, _detect_llm_provider
         manual_collector = DocumentCollector(docs_dir)
-        mode = "LLM" if os.environ.get("ANTHROPIC_API_KEY") else "keyword"
+        provider = _detect_llm_provider()
+        if provider:
+            mode = f"LLM via {provider[1]}"
+        else:
+            mode = "keyword"
         click.echo(click.style(
             f"DOCUMENT AUDIT — scanning {docs_dir} ({mode} mode)",
             fg="cyan", bold=True,

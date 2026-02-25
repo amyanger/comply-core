@@ -106,6 +106,26 @@ _MAX_CONTENT_CHARS = 50_000
 _FILENAME_WEIGHT = 2
 _KEYWORD_MATCH_THRESHOLD = 2  # minimum weighted score to count as a match
 
+# ---------------------------------------------------------------------------
+# LLM provider detection — first key found wins
+# ---------------------------------------------------------------------------
+
+_LLM_PROVIDERS = [
+    ("ANTHROPIC_API_KEY", "anthropic"),
+    ("OPENAI_API_KEY", "openai"),
+    ("GEMINI_API_KEY", "gemini"),
+    ("GOOGLE_API_KEY", "gemini"),
+]
+
+
+def _detect_llm_provider() -> tuple[str, str] | None:
+    """Return (api_key, provider_name) for the first available LLM, or None."""
+    for env_var, provider in _LLM_PROVIDERS:
+        key = os.environ.get(env_var, "")
+        if key:
+            return key, provider
+    return None
+
 
 # ---------------------------------------------------------------------------
 # File readers
@@ -169,6 +189,69 @@ def _load_documents(docs_dir: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# LLM dispatch — each provider returns the raw text response or None
+# ---------------------------------------------------------------------------
+
+
+def _call_llm(prompt: str, api_key: str, provider: str) -> str | None:
+    """Send *prompt* to the chosen LLM provider and return the response text."""
+    if provider == "anthropic":
+        return _call_anthropic(prompt, api_key)
+    if provider == "openai":
+        return _call_openai(prompt, api_key)
+    if provider == "gemini":
+        return _call_gemini(prompt, api_key)
+    logger.warning("Unknown LLM provider: %s", provider)
+    return None
+
+
+def _call_anthropic(prompt: str, api_key: str) -> str | None:
+    try:
+        from anthropic import Anthropic  # type: ignore[import-untyped]
+    except ImportError:
+        logger.warning("anthropic package not installed (pip install 'comply-core[llm-anthropic]')")
+        return None
+    client = Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text.strip()
+
+
+def _call_openai(prompt: str, api_key: str) -> str | None:
+    try:
+        from openai import OpenAI  # type: ignore[import-untyped]
+    except ImportError:
+        logger.warning("openai package not installed (pip install 'comply-core[llm-openai]')")
+        return None
+    client = OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return (response.choices[0].message.content or "").strip()
+
+
+def _call_gemini(prompt: str, api_key: str) -> str | None:
+    try:
+        from google import genai  # type: ignore[import-untyped]
+    except ImportError:
+        logger.warning(
+            "google-genai package not installed (pip install 'comply-core[llm-gemini]')"
+        )
+        return None
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+    )
+    return (response.text or "").strip()
+
+
+# ---------------------------------------------------------------------------
 # DocumentCollector
 # ---------------------------------------------------------------------------
 
@@ -207,14 +290,17 @@ class DocumentCollector(BaseCollector):
             # Not a manual task we know about — fall back to manual placeholder
             return self._manual_placeholder(control_id, description)
 
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if api_key:
+        provider = _detect_llm_provider()
+        if provider:
+            api_key, provider_name = provider
             try:
-                return await self._llm_assess(control_id, task_id, description, api_key)
+                return await self._llm_assess(
+                    control_id, task_id, description, api_key, provider_name,
+                )
             except Exception:
                 logger.warning(
-                    "LLM assessment failed for %s — falling back to keyword matching",
-                    task_id,
+                    "LLM assessment failed for %s (%s) — falling back to keyword matching",
+                    task_id, provider_name,
                     exc_info=True,
                 )
 
@@ -297,7 +383,12 @@ class DocumentCollector(BaseCollector):
     # -- LLM assessment ------------------------------------------------------
 
     async def _llm_assess(
-        self, control_id: str, task_id: str, description: str, api_key: str
+        self,
+        control_id: str,
+        task_id: str,
+        description: str,
+        api_key: str,
+        provider: str,
     ) -> EvidenceRecord:
         task_info = _TASK_KEYWORDS[task_id]
         keywords: list[str] = task_info["keywords"]
@@ -329,25 +420,12 @@ class DocumentCollector(BaseCollector):
             f'"gaps": ["<gap1>", ...]}}'
         )
 
-        import json as _json
-
-        try:
-            from anthropic import Anthropic  # type: ignore[import-untyped]
-        except ImportError:
-            logger.warning(
-                "anthropic package not installed — falling back to keyword matching "
-                "(pip install 'comply-core[llm]')"
-            )
+        raw_text = _call_llm(prompt, api_key, provider)
+        if raw_text is None:
             return self._keyword_match(control_id, task_id, description)
 
-        client = Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        import json as _json
 
-        raw_text = message.content[0].text.strip()
         result = _json.loads(raw_text)
 
         quality = int(result.get("document_quality", 0))
@@ -356,7 +434,7 @@ class DocumentCollector(BaseCollector):
         doc_exists = 1 if quality >= 30 else 0
 
         best_file = candidates[0]["filename"] if candidates else "unknown"
-        note = f"LLM assessed '{best_file}': quality {quality}/100 — {reasoning}"
+        note = f"LLM assessed '{best_file}' ({provider}): quality {quality}/100 — {reasoning}"
 
         return EvidenceRecord(
             evidence_id="",
@@ -371,6 +449,7 @@ class DocumentCollector(BaseCollector):
                 "document_quality": quality,
                 "matched_files": [{"filename": d["filename"]} for d in candidates[:5]],
                 "assessment_mode": "llm",
+                "llm_provider": provider,
                 "reasoning": reasoning,
                 "gaps": gaps,
             },
@@ -379,7 +458,7 @@ class DocumentCollector(BaseCollector):
                 severity=Severity.NONE if doc_exists else Severity.MEDIUM,
                 note=note,
             ),
-            raw_data={"llm_response": raw_text},
+            raw_data={"llm_response": raw_text, "llm_provider": provider},
         )
 
     # -- fallback ------------------------------------------------------------

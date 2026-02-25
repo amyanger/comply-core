@@ -116,16 +116,26 @@ Use `--docs` to assess governance documents offline — no Azure connection need
 # Keyword matching (default, offline, no API key needed)
 comply-core collect --demo --docs ./governance-docs/
 
-# LLM-powered assessment (set ANTHROPIC_API_KEY for deeper analysis)
-export ANTHROPIC_API_KEY=sk-ant-...
+# LLM-powered assessment — set any supported provider's API key
+export ANTHROPIC_API_KEY=sk-ant-...   # Claude
+# or: export OPENAI_API_KEY=sk-...    # ChatGPT
+# or: export GEMINI_API_KEY=...       # Gemini
 comply-core collect --demo --docs ./governance-docs/
 ```
 
 **Supported formats:** `.pdf` (requires `pip install 'comply-core[docs]'`), `.md`, `.txt`
 
+**Install the LLM provider you want:**
+
+```bash
+pip install 'comply-core[llm-anthropic]'   # Claude
+pip install 'comply-core[llm-openai]'      # ChatGPT / GPT-4o
+pip install 'comply-core[llm-gemini]'      # Gemini
+```
+
 **How it works:**
 - **Keyword mode (default):** Scans filenames (weighted 2x) and content for control-specific keywords. Free, fully offline.
-- **LLM mode (when `ANTHROPIC_API_KEY` is set):** Pre-filters docs with keywords, then sends relevant ones to Claude for quality assessment. Returns a quality score (0-100), reasoning, and gap identification. Falls back to keyword mode on any error.
+- **LLM mode (when an API key is set):** Pre-filters docs with keywords, then sends relevant ones to your chosen AI provider for quality assessment. Returns a quality score (0-100), reasoning, and gap identification. Falls back to keyword mode on any error. Supports Claude, ChatGPT, and Gemini — the first API key found is used.
 
 **Matched controls produce `COMPLIANT`** instead of `MANUAL_REQUIRED`. Unmatched controls remain `MANUAL_REQUIRED`.
 
